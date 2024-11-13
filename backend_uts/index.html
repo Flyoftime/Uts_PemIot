@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temperature Data Display</title>
+</head>
+<body>
+
+    <h1>Temperature Data</h1>
+    <div id="data-output">
+        <p><strong>Max Temperature:</strong> <span id="max-temp"></span></p>
+        <p><strong>Min Temperature:</strong> <span id="min-temp"></span></p>
+        <p><strong>Average Temperature:</strong> <span id="avg-temp"></span></p>
+
+        <h2>Detail Data (Suhu, Humid, Kecerahan)</h2>
+        <ul id="detail-data"></ul>
+
+        <h2>Month-Year Max</h2>
+        <ul id="month-year-max"></ul>
+    </div>
+
+    <script>
+        fetch('http://localhost:3000/data')
+            .then(response => response.json())
+            .then(data => {
+                // Display main temperature data
+                document.getElementById("max-temp").textContent = data.suhumax;
+                document.getElementById("min-temp").textContent = data.suhumin;
+                document.getElementById("avg-temp").textContent = data.suhurata;
+
+                // Display detail data (nilai_suhu_max_humid_max)
+                const detailDataList = document.getElementById("detail-data");
+                data.nilai_suhu_max_humid_max.forEach(item => {
+                    const listItem = document.createElement("li");
+                    listItem.textContent = `IDX: ${item.idx}, Suhu: ${item.suhu}, Humid: ${item.humid}, Kecerahan: ${item.kecerahan}, Timestamp: ${item.timestamp}`;
+                    detailDataList.appendChild(listItem);
+                });
+
+                // Display month-year max data
+                const monthYearMaxList = document.getElementById("month-year-max");
+                data.month_year_max.forEach(item => {
+                    const listItem = document.createElement("li");
+                    listItem.textContent = `Month-Year: ${item.month_year}`;
+                    monthYearMaxList.appendChild(listItem);
+                });
+            })
+            .catch(error => console.error('Error:', error));
+    </script>
+
+</body>
+</html>
