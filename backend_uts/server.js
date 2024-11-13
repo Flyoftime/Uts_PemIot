@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const mysql = require('mysql2');
 const app = express();
 const PORT = 3000;
 
@@ -7,39 +8,83 @@ app.use(cors({
     origin: 'http://127.0.0.1:5500' 
 }));
 
-app.get('/', (req, res) => {
-    res.send("Silakan akses /data untuk mendapatkan data JSON.");
+// Set up the database connection
+const db = mysql.createConnection({
+    host: 'localhost',
+    user: 'root',
+    password: '',
+    database: 'tb_cuaca'
+});
+
+db.connect((err) => {
+    if (err) {
+        console.error('Error connecting to database:', err);
+        return;
+    }
+    console.log('Connected to the database.');
 });
 
 app.get('/data', (req, res) => {
-    const data = {
-        suhumax: 36,
-        suhumin: 21,
-        suhurata: 28.35,
-        nilai_suhu_max_humid_max: [
-            {
-                idx: 101,
-                suhu: 36,
-                humid: 36,
-                kecerahan: 25,
-                timestamp: "2010-09-18 07:23:48"
-            },
-            {
-                idx: 226,
-                suhu: 36,
-                humid: 36,
-                kecerahan: 27,
-                timestamp: "2011-05-02 12:29:34"
-            }
-        ],
-        month_year_max: [
-            { month_year: "9-2010" },
-            { month_year: "5-2011" }
-        ]
-    };
+    // Query 1: Get max, min, and average temperature
+    const query1 = `
+        SELECT 
+            MAX(suhu) AS suhumax,
+            MIN(suhu) AS suhumin,
+            AVG(suhu) AS suhurata
+        FROM tb_cuaca;
+    `;
+    
+    db.query(query1, (err, results1) => {
+        if (err) {
+            console.error('Error fetching data:', err);
+            res.status(500).json({ error: 'Error fetching data in Query 1' });
+            return;
+        }
 
-    res.json(data);
+        // Query 2: Get records with max temperature and humidity
+        const query2 = `
+            SELECT id AS idx, suhu, humid, lux AS kecerahan, ts AS timestamp FROM tb_cuaca 
+            WHERE suhu = (SELECT MAX(suhu) FROM tb_cuaca) 
+            AND humid = (SELECT MAX(humid) FROM tb_cuaca);
+        `;
+
+        db.query(query2, (err, results2) => {
+            if (err) {
+                console.error('Error fetching data:', err);
+                res.status(500).json({ error: 'Error fetching data in Query 2' });
+                return;
+            }
+
+            // Query 3: Get unique month-year for max temperature and humidity
+            const query3 = `
+                SELECT DISTINCT DATE_FORMAT(ts, '%m-%Y') AS month_year 
+                FROM tb_cuaca 
+                WHERE suhu = (SELECT MAX(suhu) FROM tb_cuaca) 
+                AND humid = (SELECT MAX(humid) FROM tb_cuaca);
+            `;
+
+            db.query(query3, (err, results3) => {
+                if (err) {
+                    console.error('Error fetching data:', err);
+                    res.status(500).json({ error: 'Error fetching data in Query 3' });
+                    return;
+                }
+
+                // Combine results and send response
+                const data = {
+                    suhumax: results1[0].suhumax,
+                    suhumin: results1[0].suhumin,
+                    suhurata: results1[0].suhurata,
+                    nilai_suhu_max_humid_max: results2,
+                    month_year_max: results3.map(row => ({ month_year: row.month_year }))
+                };
+
+                res.json(data);
+            });
+        });
+    });
 });
+
 
 app.listen(PORT, () => {
     console.log(`Server berjalan di http://localhost:${PORT}`);
